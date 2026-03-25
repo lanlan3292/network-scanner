@@ -1,3 +1,13 @@
+## [1.1.0] - 2026-03-25
+
+### Changed
+- Full UI rewrite using Jetpack Compose with Material Design 3 Expressive
+- Improved device list layout and visual design
+- Smoother animations throughout the app
+
+### Added
+- Updated app screenshots and store metadata
+
 ## [1.0.2] - 2026-03-17
 
 ### Fixed

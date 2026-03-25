@@ -1,0 +1,6 @@
+UI rewrite with Jetpack Compose
+
+• Fully redesigned interface using Jetpack Compose
+• Material Design 3 Expressive components and animations
+• Improved device list with cleaner layout
+• Updated app screenshots and store metadata
