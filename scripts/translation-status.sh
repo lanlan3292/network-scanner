@@ -22,6 +22,7 @@ display_name() {
         ru) echo "Русский"    ;;
         es) echo "Español"    ;;
         uk) echo "Українська" ;;
+        ar) echo "العربية"    ;;
         *)  echo "$1"         ;;
     esac
 }
