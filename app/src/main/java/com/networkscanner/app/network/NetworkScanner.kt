@@ -29,6 +29,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Network scanner implementation with multiple discovery methods.
@@ -63,6 +64,25 @@ class NetworkScanner(private val context: Context) {
         // Precompiled regex for parsing ping RTT
         private val PING_RTT_PATTERN = Regex("""time[=<]([\d.]+)\s*ms""")
     }
+    
+        private class RateLimiter(private val ratePerSecond: Int) {
+        private val intervalMs = if (ratePerSecond > 0) 1000L / ratePerSecond else 0L
+        private val lastTime = AtomicLong(0L)
+    
+        suspend fun acquire() {
+            if (ratePerSecond <= 0) return
+            while (true) {
+                val now = System.currentTimeMillis()
+                val last = lastTime.get()
+                val next = last + intervalMs
+                if (now >= next) {
+                    if (lastTime.compareAndSet(last, now)) break
+                } else {
+                    delay(next - now)
+                }
+            }
+        }
+    }
 
     private val scanJob = SupervisorJob()
     private val scope = CoroutineScope(Dispatchers.IO + scanJob)
@@ -90,7 +110,12 @@ class NetworkScanner(private val context: Context) {
     /**
      * Start a full network scan.
      */
-    suspend fun scan(interfaceName: String? = null): ScanResult = withContext(scope.coroutineContext) {
+    suspend fun scan(
+        interfaceName: String? = null,
+        asyncScanEnabled: Boolean = true,
+        sendRate: Int = 100,
+        concurrentLimit: Int = 10
+    ): ScanResult = withContext(scope.coroutineContext) {
         val startTime = Date()
         discoveredDevices.clear()
 
@@ -132,7 +157,9 @@ class NetworkScanner(private val context: Context) {
 
             // Phase 2: Parallel ping sweep (with concurrency limit)
             updateProgress(ScanPhase.PING_SWEEP, 0.2f, context.getString(R.string.scanning_network))
-            pingSweep(networkInfo)
+            val effectiveConcurrent = if (asyncScanEnabled) concurrentLimit else 50
+            val effectiveRate = if (asyncScanEnabled) sendRate else Int.MAX_VALUE
+            pingSweep(networkInfo, effectiveConcurrent, effectiveRate)
 
             // Phase 2.5: Re-read ARP cache to get MAC addresses for discovered devices
             ArpReader.invalidateCache()
@@ -738,15 +765,23 @@ class NetworkScanner(private val context: Context) {
     /**
      * Parallel ping sweep with concurrency limited by PING_THREADS semaphore.
      */
-    private suspend fun pingSweep(networkInfo: NetworkInfo) = coroutineScope {
+    private suspend fun pingSweep(
+    networkInfo: NetworkInfo,
+    concurrentLimit: Int,
+    sendRate: Int
+    ) = coroutineScope {
         val ipRange = NetworkUtils.getIpRange(networkInfo)
         val total = ipRange.size
         val completed = AtomicInteger(0)
-        val semaphore = Semaphore(PING_THREADS)
+        val semaphore = Semaphore(concurrentLimit)
+        val rateLimiter = RateLimiter(sendRate)
 
         val jobs = ipRange.map { ip ->
             async(Dispatchers.IO) {
                 semaphore.withPermit {
+                    // 应用速率限制
+                    rateLimiter.acquire()
+    
                     val pingResult = NetworkUtils.isReachable(ip, PING_TIMEOUT_MS)
                     if (pingResult.reachable) {
                         val macAddress = ArpReader.getMacForIp(ip)
@@ -783,7 +818,6 @@ class NetworkScanner(private val context: Context) {
             }
         }
         jobs.awaitAll()
-        // Final device count update after sweep
         updateDeviceCount()
     }
 

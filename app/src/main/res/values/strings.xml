@@ -240,4 +240,9 @@
     <string name="scanned_addresses_progress">Scanned %1$d/%2$d addresses</string>
     <string name="detecting_os">Detecting OS…</string>
 
+    <string name="pref_async_scan_title">Async Scan</string>
+    <string name="pref_async_scan_summary">Enable rate and concurrency control</string>
+    <string name="pref_send_rate_title">Send Rate: %d pkt/s</string>
+    <string name="pref_concurrent_title">Concurrency: %d</string>
+
 </resources>

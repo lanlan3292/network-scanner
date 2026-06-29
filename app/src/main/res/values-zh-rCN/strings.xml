@@ -240,4 +240,9 @@
     <string name="scanned_addresses_progress">已扫描 %1$d/%2$d 个地址</string>
     <string name="detecting_os">正在检测操作系统…</string>
 
+    <string name="pref_async_scan_title">异步扫描</string>
+    <string name="pref_async_scan_summary">启用后可控制发送速率和并发量</string>
+    <string name="pref_send_rate_title">发送速率：%d 包/秒</string>
+    <string name="pref_concurrent_title">并发量：%d</string>
+
 </resources>

@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import androidx.preference.PreferenceManager
 
 /**
  * ViewModel for the main device list screen.
@@ -104,6 +105,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _networkInfo.value = _networkInfo.value
             ?: NetworkUtils.getNetworkInfo(getApplication(), _selectedInterfaceName.value)
     }
+    
+    private fun getScanSettings(): Triple<Boolean, Int, Int> {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(getApplication())
+        val async = prefs.getBoolean(SettingsViewModel.KEY_ASYNC_SCAN, true)
+        val rate = prefs.getInt(SettingsViewModel.KEY_SEND_RATE, 100)
+        val concurrent = prefs.getInt(SettingsViewModel.KEY_CONCURRENT_LIMIT, 10)
+        return Triple(async, rate, concurrent)
+    }
 
     fun onInterfaceSelected(interfaceName: String) {
         _selectedInterfaceName.value = interfaceName
@@ -127,7 +136,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.value = UiState.Scanning
 
             try {
-                val result = scanner.scan(interfaceName)
+                val (async, rate, concurrent) = getScanSettings()
+                val result = scanner.scan(interfaceName, async, rate, concurrent)
 
                 _networkInfo.value = result.networkInfo
                 updateDeviceLists(result.devices)

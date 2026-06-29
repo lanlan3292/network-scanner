@@ -15,6 +15,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     companion object {
         const val KEY_AUTO_SCAN = "auto_scan_on_start"
+        const val KEY_ASYNC_SCAN = "async_scan_enabled"
+        const val KEY_SEND_RATE = "send_rate"          // 包/秒，默认 100
+        const val KEY_CONCURRENT_LIMIT = "concurrent_limit" // 并发数，默认 10
 
         /**
          * Current in-app language: "system" to follow the device, or a language
@@ -51,6 +54,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _autoScan = MutableStateFlow(prefs.getBoolean(KEY_AUTO_SCAN, true))
     val autoScan: StateFlow<Boolean> = _autoScan.asStateFlow()
 
+    private val _asyncScanEnabled = MutableStateFlow(prefs.getBoolean(KEY_ASYNC_SCAN, true))
+    val asyncScanEnabled: StateFlow<Boolean> = _asyncScanEnabled.asStateFlow()
+
+    private val _sendRate = MutableStateFlow(prefs.getInt(KEY_SEND_RATE, 100))
+    val sendRate: StateFlow<Int> = _sendRate.asStateFlow()
+
+    private val _concurrentLimit = MutableStateFlow(prefs.getInt(KEY_CONCURRENT_LIMIT, 10))
+    val concurrentLimit: StateFlow<Int> = _concurrentLimit.asStateFlow()
+
     private val _language = MutableStateFlow(getCurrentLanguage())
     val language: StateFlow<String> = _language.asStateFlow()
 
@@ -65,6 +77,21 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setAutoScan(enabled: Boolean) {
         prefs.edit { putBoolean(KEY_AUTO_SCAN, enabled) }
         _autoScan.value = enabled
+    }
+
+    fun setAsyncScanEnabled(enabled: Boolean) {
+    prefs.edit { putBoolean(KEY_ASYNC_SCAN, enabled) }
+    _asyncScanEnabled.value = enabled
+    }
+
+    fun setSendRate(rate: Int) {
+        prefs.edit { putInt(KEY_SEND_RATE, rate) }
+        _sendRate.value = rate
+    }
+
+    fun setConcurrentLimit(limit: Int) {
+        prefs.edit { putInt(KEY_CONCURRENT_LIMIT, limit) }
+        _concurrentLimit.value = limit
     }
 
     fun setLanguage(languageCode: String) {

@@ -35,6 +35,7 @@ import com.networkscanner.app.BuildConfig
 import com.networkscanner.app.R
 import com.networkscanner.app.ui.SettingsViewModel
 import com.networkscanner.app.ui.components.SegmentSurface
+import androidx.compose.material3.Slider
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,6 +48,9 @@ fun SettingsScreen(
     val dynamicColors by viewModel.dynamicColors.collectAsState()
     val autoScan by viewModel.autoScan.collectAsState()
     val language by viewModel.language.collectAsState()
+    val asyncScanEnabled by viewModel.asyncScanEnabled.collectAsState()
+    val sendRate by viewModel.sendRate.collectAsState()
+    val concurrentLimit by viewModel.concurrentLimit.collectAsState()
 
     var showAboutDialog by remember { mutableStateOf(false) }
     var showPrivacyDialog by remember { mutableStateOf(false) }
@@ -149,6 +153,55 @@ fun SettingsScreen(
                             summary = stringResource(R.string.pref_custom_ports_summary),
                             onClick = onNavigateToCustomPorts
                         )
+                    }
+                }
+            }
+
+                        // 异步扫描设置组
+            item {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    SegmentSurface(index = 0, count = 3) {
+                        SwitchSettingItem(
+                            title = stringResource(R.string.pref_async_scan_title),
+                            summary = stringResource(R.string.pref_async_scan_summary),
+                            checked = asyncScanEnabled,
+                            onCheckedChange = { viewModel.setAsyncScanEnabled(it) }
+                        )
+                    }
+                    SegmentSurface(index = 1, count = 3) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = stringResource(R.string.pref_send_rate_title, sendRate),
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Slider(
+                                value = sendRate.toFloat(),
+                                onValueChange = { viewModel.setSendRate(it.toInt()) },
+                                valueRange = 1f..1000f,
+                                steps = 99,
+                                enabled = asyncScanEnabled,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                    SegmentSurface(index = 2, count = 3) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = stringResource(R.string.pref_concurrent_title, concurrentLimit),
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Slider(
+                                value = concurrentLimit.toFloat(),
+                                onValueChange = { viewModel.setConcurrentLimit(it.toInt()) },
+                                valueRange = 1f..50f,
+                                steps = 49,
+                                enabled = asyncScanEnabled,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
                 }
             }
