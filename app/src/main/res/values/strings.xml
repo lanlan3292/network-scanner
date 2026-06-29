@@ -241,7 +241,7 @@
     <string name="detecting_os">Detecting OS…</string>
 
     <string name="large_subnet_title">Large Subnet Detected</string>
-    <string name="large_subnet_message">The current network subnet is large (/%s), and scanning all IPs may take a long time. It is recommended to scan only the /24 subnet.</string>
+    <string name="large_subnet_message">The current network subnet is large (%s), and scanning all IPs may take a long time. It is recommended to scan only the /24 subnet.</string>
     <string name="large_subnet_scan_24">Scan Only /24</string>
     <string name="large_subnet_scan_custom">Custom Range</string>
     <string name="large_subnet_scan_all">Scan Entire Large Subnet (Time-Consuming)</string>
