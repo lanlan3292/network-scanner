@@ -46,6 +46,10 @@ import androidx.preference.PreferenceManager
 import com.networkscanner.app.R
 import com.networkscanner.app.data.Device
 import com.networkscanner.app.ui.MainViewModel
+import com.networkscanner.app.ui.MainViewModel.LargeSubnetOption
+import com.networkscanner.app.ui.screens.home.LargeSubnetWarningDialog
+import com.networkscanner.app.ui.screens.home.CustomRangeDialog
+import androidx.compose.material.icons.outlined.Tune
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -54,6 +58,9 @@ fun HomeScreen(
     onDeviceClick: (Device) -> Unit,
     onSettingsClick: () -> Unit
 ) {
+    val showLargeSubnetDialog by viewModel.showLargeSubnetDialog.collectAsState()
+    val showCustomRangeDialog by viewModel.showCustomRangeDialog.collectAsState()
+
     val uiState by viewModel.uiState.collectAsState()
     val onlineDevices by viewModel.onlineDevices.collectAsState()
     val offlineDevices by viewModel.offlineDevices.collectAsState()
@@ -96,6 +103,29 @@ fun HomeScreen(
         }
     }
 
+    // 1. 大网段弹窗：正确计算网段大小并传入，修改关闭逻辑
+    if (showLargeSubnetDialog) {
+        val prefix = networkInfo?.networkPrefix ?: 24
+        val subnetSize = if (prefix < 32) 1L shl (32 - prefix) else 1L
+
+        LargeSubnetWarningDialog(
+            subnetSize = subnetSize,
+            onDismiss = { viewModel.dismissLargeSubnetDialog() }, // 正确关闭，不触发扫描
+            onScan24 = { viewModel.onLargeSubnetOption(LargeSubnetOption.SCAN_24) },
+            onCustom = { viewModel.onLargeSubnetOption(LargeSubnetOption.SCAN_CUSTOM) },
+            onScanAll = { viewModel.onLargeSubnetOption(LargeSubnetOption.SCAN_ALL) }
+        )
+    }
+
+    // 2. 自定义范围弹窗
+    if (showCustomRangeDialog) {
+        CustomRangeDialog(
+            onDismiss = { viewModel.cancelCustomRange() }, 
+            onConfirm = { start, end -> viewModel.onCustomRangeConfirmed(start, end) },
+            onScanDefault24 = { viewModel.onLargeSubnetOption(LargeSubnetOption.SCAN_24) }
+        )
+    }
+
     val isScanning = uiState is MainViewModel.UiState.Scanning
     val hasDevices = onlineDevices.isNotEmpty() || offlineDevices.isNotEmpty()
     val showFab = !isScanning
@@ -106,6 +136,12 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
                 actions = {
+                    IconButton(onClick = { viewModel.openCustomRangeDialog() }) {
+                        Icon(
+                            imageVector = Icons.Outlined.Tune,
+                            contentDescription = stringResource(R.string.custom_range_title)
+                        )
+                    }
                     IconButton(onClick = onSettingsClick) {
                         Icon(
                             imageVector = Icons.Outlined.Settings,
@@ -177,7 +213,6 @@ fun HomeScreen(
                 }
             }
 
-            // Floating scan progress bar at the bottom
             AnimatedVisibility(
                 visible = isScanning,
                 enter = slideInVertically(motionScheme.defaultSpatialSpec()) { it } + fadeIn(motionScheme.defaultEffectsSpec()),

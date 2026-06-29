@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import com.networkscanner.app.util.IpUtils
 
 /**
  * ViewModel for the main device list screen.
@@ -50,6 +51,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _errorMessage = Channel<String>(Channel.BUFFERED)
     val errorMessage = _errorMessage.receiveAsFlow()
+
+    // 新增状态：自定义范围、对话框显示等
+    private val _customRange = MutableStateFlow<Pair<Long, Long>?>(null)
+    val customRange: StateFlow<Pair<Long, Long>?> = _customRange.asStateFlow()
+
+    private val _showLargeSubnetDialog = MutableStateFlow(false)
+    val showLargeSubnetDialog: StateFlow<Boolean> = _showLargeSubnetDialog.asStateFlow()
+
+    private val _showCustomRangeDialog = MutableStateFlow(false)
+    val showCustomRangeDialog: StateFlow<Boolean> = _showCustomRangeDialog.asStateFlow()
+
+    // 缓存当前网络信息，用于大子网检测
+    private var currentNetworkInfo: NetworkInfo? = null
 
     init {
         viewModelScope.launch {
@@ -124,34 +138,62 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
 
-            _uiState.value = UiState.Scanning
+            // 获取网络信息
+            val netInfo = NetworkUtils.getNetworkInfo(getApplication(), interfaceName)
+            if (netInfo == null) {
+                _uiState.value = UiState.NoWifi
+                return@launch
+            }
+            currentNetworkInfo = netInfo
 
-            try {
-                val result = scanner.scan(interfaceName)
+            // 检测大子网
+            val prefix = netInfo.networkPrefix
+            if (IpUtils.isLargeSubnet(prefix)) {
+                // 如果尚未设置自定义范围，则弹出大子网警告对话框
+                if (_customRange.value == null) {
+                    _showLargeSubnetDialog.value = true
+                    return@launch
+                }
+            }
 
-                _networkInfo.value = result.networkInfo
-                updateDeviceLists(result.devices)
+            // 否则直接执行扫描（使用现有 customRange 或 null）
+            performScan(interfaceName, _customRange.value)
+        }
+    }
 
-                when (result.scanStatus) {
-                    ScanStatus.COMPLETED -> {
-                        if (result.devices.isEmpty()) {
-                            _uiState.value = UiState.Empty
-                        } else {
-                            _uiState.value = UiState.Success(result)
-                        }
-                    }
-                    ScanStatus.ERROR -> {
-                        _uiState.value = UiState.Error(result.error ?: "Unknown error")
-                        _errorMessage.trySend(result.error ?: "Unknown error")
-                    }
-                    else -> {
-                        _uiState.value = UiState.Idle
+    /**
+     * 实际执行扫描的私有方法
+     */
+    private suspend fun performScan(interfaceName: String, range: Pair<Long, Long>?) {
+        _uiState.value = UiState.Scanning
+        try {
+            val result = if (range != null) {
+                scanner.scan(interfaceName, range)
+            } else {
+                scanner.scan(interfaceName)
+            }
+            _networkInfo.value = result.networkInfo
+            updateDeviceLists(result.devices)
+
+            when (result.scanStatus) {
+                ScanStatus.COMPLETED -> {
+                    if (result.devices.isEmpty()) {
+                        _uiState.value = UiState.Empty
+                    } else {
+                        _uiState.value = UiState.Success(result)
                     }
                 }
-            } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "Scan failed")
-                _errorMessage.trySend(e.message ?: "Scan failed")
+                ScanStatus.ERROR -> {
+                    _uiState.value = UiState.Error(result.error ?: "Unknown error")
+                    _errorMessage.trySend(result.error ?: "Unknown error")
+                }
+                else -> {
+                    _uiState.value = UiState.Idle
+                }
             }
+        } catch (e: Exception) {
+            _uiState.value = UiState.Error(e.message ?: "Scan failed")
+            _errorMessage.trySend(e.message ?: "Scan failed")
         }
     }
 
@@ -161,6 +203,86 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun cancelScan() {
         scanner.cancel()
         _uiState.value = UiState.Idle
+    }
+
+    /**
+     * 大子网选项枚举
+     */
+    enum class LargeSubnetOption {
+        SCAN_24,      // 仅扫描 /24
+        SCAN_CUSTOM,  // 自定义范围
+        SCAN_ALL      // 扫描整个大子网（警告）
+    }
+
+    /**
+     * 处理大子网对话框的用户选择
+     */
+    fun onLargeSubnetOption(option: LargeSubnetOption) {
+        _showLargeSubnetDialog.value = false
+        val netInfo = currentNetworkInfo ?: return
+        val interfaceName = _selectedInterfaceName.value ?: return
+
+        when (option) {
+            LargeSubnetOption.SCAN_24 -> {
+                // 使用 /24 默认范围
+                val defaultRange = IpUtils.getDefaultRangeForNetwork(netInfo)
+                if (defaultRange != null) {
+                    _customRange.value = defaultRange
+                    viewModelScope.launch { performScan(interfaceName, defaultRange) }
+                } else {
+                    // 回退到原始 /24 范围（以防解析失败）
+                    viewModelScope.launch { performScan(interfaceName, null) }
+                }
+            }
+            LargeSubnetOption.SCAN_CUSTOM -> {
+                // 显示自定义范围输入对话框
+                _showCustomRangeDialog.value = true
+            }
+            LargeSubnetOption.SCAN_ALL -> {
+                // 扫描整个大子网（真实范围）
+                val realRange = IpUtils.getSubnetRange(
+                    IpUtils.ipToLong(netInfo.ipAddress),
+                    netInfo.networkPrefix
+                )
+                _customRange.value = realRange
+                viewModelScope.launch { performScan(interfaceName, realRange) }
+            }
+        }
+    }
+
+    /**
+     * 自定义范围确认回调
+     */
+    fun onCustomRangeConfirmed(startIp: String, endIp: String) {
+        _showCustomRangeDialog.value = false
+        // 解析并验证 IP 范围
+        val start = IpUtils.ipToLong(startIp)
+        val end = IpUtils.ipToLong(endIp)
+        if (start > end) {
+            _errorMessage.trySend("起始 IP 不能大于结束 IP")
+            return
+        }
+        // 可选：限制 IP 数量，防止过大
+        val count = end - start + 1
+        if (count > 10000) {  // 可调整阈值
+            _errorMessage.trySend("IP 数量过多（${count}个），请缩小范围")
+            return
+        }
+        _customRange.value = start to end
+        val interfaceName = _selectedInterfaceName.value ?: return
+        viewModelScope.launch { performScan(interfaceName, start to end) }
+    }
+
+    fun cancelCustomRange() {
+        _showCustomRangeDialog.value = false
+    }
+
+    fun openCustomRangeDialog() {
+        _showCustomRangeDialog.value = true
+    }
+
+    fun dismissLargeSubnetDialog() {
+        _showLargeSubnetDialog.value = false
     }
 
     /**

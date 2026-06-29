@@ -29,11 +29,12 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import com.networkscanner.app.util.IpUtils
 
 /**
  * Network scanner implementation with multiple discovery methods.
  */
-class NetworkScanner(private val context: Context) {
+class NetworkScanner(private val context: Context) {    
 
     companion object {
         private const val PING_TIMEOUT_MS = 1000  // 1 second timeout for ping
@@ -90,7 +91,10 @@ class NetworkScanner(private val context: Context) {
     /**
      * Start a full network scan.
      */
-    suspend fun scan(interfaceName: String? = null): ScanResult = withContext(scope.coroutineContext) {
+    suspend fun scan(
+        interfaceName: String? = null,
+        customRange: Pair<Long, Long>? = null   // 新增参数
+    ): ScanResult = withContext(scope.coroutineContext) {
         val startTime = Date()
         discoveredDevices.clear()
 
@@ -132,7 +136,13 @@ class NetworkScanner(private val context: Context) {
 
             // Phase 2: Parallel ping sweep (with concurrency limit)
             updateProgress(ScanPhase.PING_SWEEP, 0.2f, context.getString(R.string.scanning_network))
-            pingSweep(networkInfo)
+            val ipRange = if (customRange != null) {
+                val (start, end) = customRange
+                (start..end).map { IpUtils.longToIp(it) }
+            } else {
+                NetworkUtils.getIpRange(networkInfo)
+            }
+            pingSweep(networkInfo, ipRange)
 
             // Phase 2.5: Re-read ARP cache to get MAC addresses for discovered devices
             ArpReader.invalidateCache()
@@ -738,8 +748,7 @@ class NetworkScanner(private val context: Context) {
     /**
      * Parallel ping sweep with concurrency limited by PING_THREADS semaphore.
      */
-    private suspend fun pingSweep(networkInfo: NetworkInfo) = coroutineScope {
-        val ipRange = NetworkUtils.getIpRange(networkInfo)
+    private suspend fun pingSweep(networkInfo: NetworkInfo, ipRange: List<String>) = coroutineScope {
         val total = ipRange.size
         val completed = AtomicInteger(0)
         val semaphore = Semaphore(PING_THREADS)

@@ -240,4 +240,17 @@
     <string name="scanned_addresses_progress">Scanned %1$d/%2$d addresses</string>
     <string name="detecting_os">Detecting OS…</string>
 
+    <string name="large_subnet_title">Large Subnet Detected</string>
+    <string name="large_subnet_message">The current network subnet is large (/%s), and scanning all IPs may take a long time. It is recommended to scan only the /24 subnet.</string>
+    <string name="large_subnet_scan_24">Scan Only /24</string>
+    <string name="large_subnet_scan_custom">Custom Range</string>
+    <string name="large_subnet_scan_all">Scan Entire Large Subnet (Time-Consuming)</string>
+    <string name="custom_range_title">Custom IP Range</string>
+    <string name="custom_range_hint">Enter IP range (start-end or CIDR)</string>
+    <string name="custom_range_label">IP Range</string>
+    <string name="custom_range_examples">Example: 192.168.1.1-192.168.1.254 or 192.168.1.0/24</string>
+    <string name="custom_range_scan">Scan</string>
+    <string name="custom_range_cancel">Cancel</string>
+    <string name="custom_range_invalid">Invalid IP range</string>
+
 </resources>
