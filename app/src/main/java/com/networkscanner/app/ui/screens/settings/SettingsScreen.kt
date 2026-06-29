@@ -180,7 +180,7 @@ fun SettingsScreen(
                             Slider(
                                 value = sendRate.toFloat(),
                                 onValueChange = { viewModel.setSendRate(it.toInt()) },
-                                valueRange = 1f..1000f,
+                                valueRange = 1f..10000f,
                                 steps = 99,
                                 enabled = asyncScanEnabled,
                                 modifier = Modifier.fillMaxWidth()
@@ -196,7 +196,7 @@ fun SettingsScreen(
                             Slider(
                                 value = concurrentLimit.toFloat(),
                                 onValueChange = { viewModel.setConcurrentLimit(it.toInt()) },
-                                valueRange = 1f..50f,
+                                valueRange = 1f..2000f,
                                 steps = 49,
                                 enabled = asyncScanEnabled,
                                 modifier = Modifier.fillMaxWidth()

@@ -30,6 +30,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import android.util.Log
 
 /**
  * Network scanner implementation with multiple discovery methods.
@@ -782,6 +783,8 @@ class NetworkScanner(private val context: Context) {
                     // 应用速率限制
                     rateLimiter.acquire()
     
+                    Log.d("PingSweep", "Pinging $ip at ${System.currentTimeMillis()}")
+
                     val pingResult = NetworkUtils.isReachable(ip, PING_TIMEOUT_MS)
                     if (pingResult.reachable) {
                         val macAddress = ArpReader.getMacForIp(ip)
