@@ -90,7 +90,7 @@ private fun LazyListScope.deviceSection(
     }
     itemsIndexed(
         items = devices,
-        key = { _, device -> device.ipAddress },
+        key = { _, device -> "${device.ipAddress}_${device.macAddress.orEmpty()}" },
         contentType = { _, _ -> "device" }
     ) { index, device ->
         Surface(
